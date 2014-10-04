@@ -1,0 +1,100 @@
+@font-face {
+  font-family: 'bebas';      
+  src: url('../fonts/BEBAS.ttf') format('truetype'); /* Chrome 4+, Firefox 3.5, Opera 10+, Safari 3—5 */
+}
+@font-face {
+  font-family: 'bebasnue';      
+  src: url('../fonts/BebasNue.otf') format('truetype'); /* Chrome 4+, Firefox 3.5, Opera 10+, Safari 3—5 */
+}
+
+
+.switcher{
+    border: 1px solid #f8f8f8;
+    background: #f8f8f8;
+}
+.switcher:hover{
+    border: 1px solid #eeeeee;
+    background: #eeeeee;
+}
+/*
+.output{
+    padding-top: 10px;    
+    font-size: 55px;
+    color:#000;
+}
+.output small{
+    color: #000000;
+    font-size: 25px;
+}
+.output ul{
+    list-style: none;        
+}
+.output ul li{
+    float: left;
+    padding-left: 1em;
+}
+.output ul li sup{
+    font-size: 30px;
+}
+#daya{
+    font-size: 100px;
+    padding-left: 3em;
+    padding-bottom: 90px;    
+}
+#arus{
+
+}
+#tegangan{
+
+}
+#pf{
+
+}
+
+#daya sup{
+    font-size: 65px;
+}
+*/
+
+.selectoutlet ul{
+    list-style: none;    
+}
+.onoffradio{        
+    height: 30px;    
+}
+.onoffradio-checkbox{   
+    display: none;
+}
+.onoffradio-label{
+    cursor: pointer;
+    font-family: sans-serif;    
+}
+.onoffradio-inner{   
+    font-family: sans-serif;
+}
+.onoffradio-inner:before, .onoffradio-inner:after {
+    content: " ";    
+}  
+.onoffradio-inner:after{           
+    color:#428bca;
+}
+#outlet1:after{
+    content: "Outlet 1";
+}
+#outlet2:after{
+    content: "Outlet 2";
+}
+#outlet3:after{
+    content: "Outlet 3";
+}
+.onoffradio-checkbox:checked + .onoffradio-label .onoffradio-inner:after {
+    padding: 15px;
+    box-sizing: border-box;
+    background: #eeeeee;
+    
+}
+/*--------------------------------------------------------------*/
+.navbar-top-links li label {
+    padding: 15px;
+    min-height: 50px;
+}

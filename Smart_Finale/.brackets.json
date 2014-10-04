@@ -1,0 +1,11 @@
+{
+    "jscodehints.detectedExclusions": [
+        "/var/www/html/Smart_Finale/present_js.js",
+        "/var/www/html/Smart_Finale/js/bootstrap.min.js",
+        "/var/www/html/Smart_Finale/js/sb-admin-2.js",
+        "/var/www/html/Smart_Finale/js/bootstrap.js",
+        "/var/www/html/Smart_Finale/js/chart-js.js",
+        "/var/www/html/Smart_Finale/chart-js/highcharts.js",
+        "/var/www/html/Smart_Finale/chart-js/highcharts.src.js"
+    ]
+}
