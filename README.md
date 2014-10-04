@@ -13,6 +13,6 @@ Smart Outlet system is divided into three parts:
 
 > Website                 - Worked by Dimas Adinugroho    https://www.facebook.com/dimas.a.nugroho.908
 
-This repository contains the codes from the <Worked on> phase of the Web and Master Unit.
+This repository contains the codes from the \<Worked On\> phase of the Web and Master Unit.
 
 Feel free to learn and share.
