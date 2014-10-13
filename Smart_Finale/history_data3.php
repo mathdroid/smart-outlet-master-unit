@@ -35,7 +35,7 @@
 //    print json_encode($result, JSON_NUMERIC_CHECK);
 //    mysql_close($con);
 	$dbhost 	= "localhost";
-	$dbname		= "temps";
+	$dbname		= "smart_smartsocket";
 	$dbuser		= "monitor";
 	$dbpass		= "smartsocket";
     
@@ -60,7 +60,7 @@
     }
     mysql_select_db($dbname, $con);			
 
-    $query = mysql_query("SELECT * FROM powerlog WHERE sid=3")or die(mysql_error()); 
+    $query = mysql_query("SELECT * FROM powerlog_history WHERE sid=3")or die(mysql_error()); 
     while ($rows = mysql_fetch_array($query)):
        $mysqltime = $rows['timestamp'];        
        $timestamp = strtotime($mysqltime);

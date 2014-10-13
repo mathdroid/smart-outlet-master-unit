@@ -1,8 +1,8 @@
 <?php 
     $dbhost 	= "localhost"; 
-	$dbname		= "muhammad_smartmeter";
-	$dbuser		= "root";
-	$dbpass		= "password";
+	$dbname		= "smart_smartsocket";
+	$dbuser		= "monitor";
+	$dbpass		= "smartsocket";
 	// database connection
 
 	$con = mysql_connect($dbhost,$dbuser,$dbpass);
