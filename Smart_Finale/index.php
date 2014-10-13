@@ -1,11 +1,11 @@
 <?php    
 	$dbhost 	= "localhost";
 	//$dbname		= "muhammad_smartmeter";
-	$dbname		= "temps";
+	$dbname		= "smart_smartsocket";
 	$dbuser		= "monitor";
 	$dbpass		= "smartsocket";
     
-    $totalbudget= 0;
+    	$totalbudget= 0;
 	$totalkwh	= 0;
 	$kwh1 = 0;
 	$kwh2 = 0;	
@@ -32,11 +32,11 @@
         $totalbudget = $totalbudget+ $budget;
     endwhile;    	
 	while ($rows = mysql_fetch_array($query_switch)):       
-        if ($rows['sid']=="zone 1"){
+        if ($rows['sid']==1){
 			$status1 = $rows['status'];       
-		}elseif ($rows['sid']=="zone 2"){
+		}elseif ($rows['sid']==2){
 			$status2 = $rows['status'];       
-		}elseif ($rows['sid']=="zone 3"){
+		}elseif ($rows['sid']==3){
 			$status3 = $rows['status'];       
 		}		
     endwhile;         	
