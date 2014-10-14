@@ -28,8 +28,8 @@ try:
 		#powerlog_history is (datetime, tinyint(3),float,float)
 		#old - params = ['S00'+str(nsocket), teg, arus, teg * arus, pf]
 		#params = [nsocket, 51.2, 21.5]
-		curs.execute("INSERT INTO powerlog_history (timestamp, sid, kwh) SELECT timestamp, sid, daya*0.25 FROM powerlog_rt WHERE sid=%s", nsocket)
-  		
+		curs.execute("INSERT INTO powerlog_history (timestamp, sid, kwh, budget) SELECT timestamp, sid, daya*0.25, daya*0.25*605 FROM powerlog_rt WHERE sid=%s", nsocket)
+  		#source http://pulsa-online.com/wp-content/uploads/2013/10/Tarif-Tenaga-Listrik-2013.jpg
   		nsocket += 1
 		db.commit()
 	print "All data committed"
