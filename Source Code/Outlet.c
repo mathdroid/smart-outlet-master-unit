@@ -1,6 +1,12 @@
+#include <avr/io.h>
+#include <avr/interrupt.h>
+#include <util/delay.h>
 #include "nRF24L01.h"
-#include "SPI.h"
-#include <math.h>
+
+#define sbi(x,y) (x) |= _BV((y))
+#define cbi(x,y) (x) &= ~_BV((y))
+#define wbi(x,y,z) if (z) sbi((x),(y)); else cbi((x),(y))
+#define rbi(x,y) ((x) & _BV((y)))
 
 #define I1_ADC 3
 #define I1_ADC_P PORTC
@@ -12,12 +18,18 @@
 #define RXLED_P PORTD
 #define TXLED 7
 #define TXLED_P PORTD
+#define POWERLED 4
+#define POWERLED_P PORTD
+#define ENERGYLED 2
+#define ENERGYLED_P PORTB
+#define RELAYLED 5
+#define RELAYLED_P PORTD
 #define RELAY 2
 #define RELAY_P PORTD
-#define RFDATA1 0
-#define RFDATA1_P PORTB
-#define RFDATA2 1
-#define RFDATA2_P PORTB
+#define CSN 0
+#define CSN_P PORTB
+#define CE 1
+#define CE_P PORTB
 #define RFIRQ 3
 #define RFIRQ_P PORTD
 
@@ -40,19 +52,40 @@
 
 // ADC : Free Running, Interrupt Enabled
 
-// To do : Light State, Switch State Indicator
+// Light State :
+// 00 : Functional
+// 01 : All On
+// 11 : All Off
 
-void Init () {
+
+// Global Variables
+
+unsigned char readFlag, lightState, switchState, loadData, ADCCount;
+unsigned int sample, sample_Temp, timerTop;
+unsigned int VTemp, I1Temp, I2Temp;
+float VRaw, I1Raw, I2Raw, I1Sqr, I2Sqr;
+float VSqrSum, I1SqrSum, I2SqrSum, PSum;
+float I1SqrSum_Temp, I2SqrSum_Temp, VSqrSum_Temp, PSum_Temp;
+float I1RMS, I2RMS, VRMS, PAVG;
+
+float abs (float f) {
+	if (f<0)
+		return -f;
+	else
+		return f;
+}
+
+void Init (void) {
 	// Define Ports
 	DDRB  = 0b00101111;
-	PORTB = 0b00010000;
+	PORTB = 0b00010010;
 	DDRC  = 0b00000000;
 	PORTC = 0b00000111;
 	DDRD  = 0b11110010;
 	PORTD = 0b00001101;
 	
 	// Initialize ADC
-	ADCSRA = _BV(ADEN)|_BV(ADSC)|_BV(ADFR)|_BV(ADIE)|(0b100<<ADPS0);
+	ADCSRA = _BV(ADEN)|_BV(ADSC)|_BV(ADFR)|_BV(ADIE)|(0b110<<ADPS0);
 	ADMUX = (0b01<<REFS0);
 	
 	// Initialize Interrupt
@@ -70,29 +103,179 @@ void Init () {
 	
 	// Global Interrupt Enable
 	sei();
-
+	
+	// Variable Initialization
+	readFlag = 0;
 }
 
-void ReadVI () {
-	VTemp = read_adc(V_ADC);
-	I1Temp = read_adc(I1_ADC);
-	I2Temp = read_adc(I2_ADC);
-	VRaw = 						// Normalize
-	I1Raw = 						// Normalize
-	I2Raw = 						// Normalize
-	I1Sqr = I1Raw*I1Raw;
-	I2Sqr = I2Raw*I2Raw;
-	VSqrSum += VRaw*VRaw;
-	I1SqrSum += I1Sqr;
-	I2SqrSum += I2Sqr;
-	if (abs(I1Sqr) > abs(I2Sqr))
-		PSum += I1Sqr;
-	else
-		PSum += I2Sqr;
-	sample++;
+unsigned int read_adc (unsigned char channel) {
+
+	union ADCValue {
+		int i;
+		char c[2];
+	} ADCValue;
+	
+	ADCValue.c[0] = ADCH;
+	ADCValue.c[1] = ADCL;
+	ADMUX |= channel;
+	ADCSRA |= 0x10;						// Clear the flags
+    ADCSRA |= _BV(ADSC);				// Start the AD conversion
+    return ADCValue.i;
 }
 
-void Calculate () {
+char WriteByteSPI (unsigned char cData) {
+	SPDR = cData;
+	while (!(SPSR & BIT(SPIF)));
+	return SPDR;
+}
+
+uint8_t NRF_GetReg (uint8_t reg) {
+	_delay_us(10);
+	CLEARBIT(CSN_P,CSN);
+	_delay_us(10);
+	WriteByteSPI(R_REGISTER + reg);
+	_delay_us(10);
+	reg = WriteByteSPI(NOP);
+	_delay_us(10);
+	SETBIT(CSN_P,CSN);
+	return reg;
+}
+
+void NRF_WriteReg (uint8_t reg, uint8_t Package) {
+	_delay_us(10);
+	CLEARBIT(CSN_P,CSN);
+	_delay_us(10);
+	WriteByteSPI(W_REGISTER + reg);
+	_delay_us(10);
+	WriteByteSPI(Package);
+	_delay_us(10);
+	SETBIT(CSN_P,CSN);
+}
+
+uint8_t *NRF_Write (uint8_t ReadWrite, uint8_t reg, uint8_t *val, uint8_t antVal) {
+	if (ReadWrite == W) {
+		reg = W_REGISTER + reg;
+	}
+	
+	static uint8_t ret[32];
+	
+	_delay_us(10);
+	CLEARBIT(CSN_P,CSN);
+	_delay_us(10);
+	WriteByteSPI(reg);
+	_delay_us(10);
+	
+	int i;
+	for (i=0;i<antVal;i++) {
+		if ((ReadWrite == R) && (reg != W_TX_PAYLOAD)) {
+			ret[i] = WriteByteSPI(NOP);
+			_delay_us(10);
+		} else {
+			WriteByteSPI(val[i]);
+			_delay_us(10);
+		}
+	}
+	SETBIT(CSN_P,CSN);
+	
+	return ret;
+}
+
+void NRF_Init (void) {
+	_delay_ms(100);
+	
+	uint8_t val[5];
+	
+	val[0] = 0x01;
+	NRF_Write(W,EN_AA,val,1);
+	
+	val[0] = 0x01;
+	NRF_Write(W,EN_RXADDR,val,1);
+	
+	val[0] = 0x03;
+	NRF_Write(W,SETUP_AW,val,1);
+	
+	val[0] = 0x01;
+	NRF_Write(W,RF_CH,val,1);
+	
+	val[0] = 0x07;
+	NRF_Write(W,RF_SETUP,val,1);
+	
+	int i;
+	for (i=0;i<5;i++) {
+		val[i]=0x12;
+	}
+	NRF_Write(W,RX_ADDR_P0,val,5);
+	
+	for (i=0;i<5;i++) {
+		val[i]=0x12;
+	}
+	NRF_Write(W,TX_ADDR,val,5);
+	
+	val[0] = 5;
+	NRF_Write(W,RX_PW_P0,val,1);
+	
+	val[0] = 0x1E;
+	NRF_Write(W,CONFIG,val,1);
+	
+	_delay_ms(100);
+}
+
+void NRF_TransmitPayload (uint8_t *W_buff) {
+	NRF_Write(R,FLUSH_TX,W_buff,0);
+	NRF_Write(R,W_TX_PAYLOAD,W_buff,5);
+	
+	_delay_ms(10);
+	SETBIT(CSN_P,CSN);
+	_delay_ms(20);
+	CLEARBIT(CSN_P,CSN);
+	_delay_ms(10);
+}
+
+void NRF_ReceivePayload (void) {
+	SETBIT(CSN_P,CSN);
+	_delay_ms(1000);
+	CLEARBIT(CSN_P,CSN);
+}
+
+void NRF_Reset (void) {
+	_delay_ms(10);
+	CLEARBIT(CSN_P,CSN);
+	_delay_ms(10);
+	WriteByteSPI(W_REGISTER + STATUS);
+	_delay_ms(10);
+	WriteByteSPI(0x70);
+	_delay_ms(10);
+	SETBIT(CSN_P,CSN);
+}
+
+void ReadVI (void) {
+	
+	switch (ADCCount) {
+		case 3 :
+			I1Temp = read_adc(++ADCCount); break;
+		case 4 : VTemp = read_adc(++ADCCount); break;
+		case 5 :
+			ADCCount = 3;
+			I2Temp = read_adc(ADCCount);
+			VRaw = (VTemp-512)*1.0791015625;		// Normalize : (VTemp-512)*221*5/1024
+			I1Raw = (-0.00732421875*I1Raw)+2.5;		// Normalize : (-1.5*I1Raw*5/1024)+2.5
+			I2Raw = (-0.00732421875*I2Raw)+2.5;		// Normalize : (-1.5*I2Raw*5/1024)+2.5
+			I1Sqr = I1Raw*I1Raw;
+			I2Sqr = I2Raw*I2Raw;
+			VSqrSum += VRaw*VRaw;
+			I1SqrSum += I1Sqr;
+			I2SqrSum += I2Sqr;
+			if (abs(I1Sqr) > abs(I2Sqr))
+				PSum += I1Sqr;
+			else
+				PSum += I2Sqr;
+			sample++;
+			break;
+	}
+	
+}
+
+void Calculate (void) {
 	I1SqrSum_Temp = I1SqrSum;
 	I2SqrSum_Temp = I2SqrSum;
 	VSqrSum_Temp = VSqrSum;
@@ -108,8 +291,8 @@ void Calculate () {
 	VRMS = sqrt(VSqrSum_Temp/sample_Temp);
 	PAVG = sqrt(PSum_Temp/sample_Temp);
 	timerTop = (59400/(unsigned int)PAVG) + 250;
-	OCR1AH = unsigned char(timerTop >> 8);
-	OCR1AL = unsigned char(timerTop & 0xFF);
+	OCR1AH = (unsigned char) (timerTop >> 8);
+	OCR1AL = (unsigned char) (timerTop & 0xFF);
 }
 
 ISR (ADC_vect) {
@@ -120,13 +303,21 @@ ISR (INT0_vect, ISR_NOBLOCK) {
 	readFlag = 1;
 }
 
-void main (void) {
+int main (void) {
+
+	unsigned char rData, tData[13];
+	union hybrid {
+		float f;
+		int i[2];
+		char c[4];
+	} VRMS_, I1RMS_, I2RMS_, PAVG_;
+
 	// Initialization
 	Init();
 	NRF_Init();
 	
 	// Enable Rx Mode
-	NRF_Write(CONFIG, BIT(EN_CRC) + BIT(PWR_UP) + BIT(PRIM_RX));
+	NRF_WriteReg(CONFIG, BIT(EN_CRC) + BIT(PWR_UP) + BIT(PRIM_RX));
 	
 	while (1) {
 		if (sample >= 20000) {
@@ -138,6 +329,30 @@ void main (void) {
 			switchState = rData & 0x01;
 			lightState = rData & 0x7E;
 			loadData = rData & 0x80;
+			if (switchState == 1)
+				sbi(RELAY_P,RELAY);
+			else
+				cbi(RELAY_P,RELAY);
+			if ((lightState >> 1) == 0) {
+				if ((lightState << 7) != 0) {	// Functional
+					TCCR1A = 0b10<<COM1B0;
+					sbi(POWERLED_P,POWERLED);
+					if (switchState == 1)
+						sbi(RELAYLED_P,RELAYLED);
+					else
+						cbi(RELAYLED_P,RELAYLED);
+				} else {						// All On
+					TCCR1A = 0b00<<COM1B0;
+					sbi(ENERGYLED_P,ENERGYLED);
+					sbi(POWERLED_P,POWERLED);
+					sbi(RELAYLED_P,RELAYLED);
+				}
+			} else {							// All Off
+				TCCR1A = 0b00<<COM1B0;
+				cbi(ENERGYLED_P,ENERGYLED);
+				cbi(POWERLED_P,POWERLED);
+				cbi(RELAYLED_P,RELAYLED);
+			}
 		}
 		
 		if (loadData) {
