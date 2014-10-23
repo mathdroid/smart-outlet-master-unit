@@ -3,7 +3,7 @@
 #include <util/delay.h>
 #include <math.h>
 #include <stdlib.h>
-
+#define ADC_VREF_TYPE 0x40
 /*
 Copyright (c) 2007 Stefan Engelke <mbox@stefanengelke.de>
 Permission is hereby granted, free of charge, to any person
@@ -157,8 +157,6 @@ DEALINGS IN THE SOFTWARE.
 #define POWERLED_P PORTD
 #define ENERGYLED 2
 #define ENERGYLED_P PORTB
-#define RELAYLED 5
-#define RELAYLED_P PORTD
 #define RELAY 2
 #define RELAY_P PORTD
 #define CSN 0
@@ -171,7 +169,6 @@ DEALINGS IN THE SOFTWARE.
 // Receive Bytes :  
 // Byte 0 - Commands
 //  Bit 7 - Load Data
-//  Bit 1 - Light
 //  Bit 0 - Switch
 
 // Transmit Bytes :
@@ -179,7 +176,6 @@ DEALINGS IN THE SOFTWARE.
 // Byte 8..5 - Current Reading
 // Byte 4..1 - Power Reading
 // Byte 0 :
-//  Bit 1 - Light State
 //  Bit 0 - Switch State
 
 // Timer :
@@ -187,21 +183,17 @@ DEALINGS IN THE SOFTWARE.
 
 // ADC : Free Running, Interrupt Enabled
 
-// Light State :
-// 00 : Functional
-// 01 : All On
-// 11 : All Off
-
 
 // Global Variables
 
-unsigned char readFlag, lightState, switchState, loadData, ADCCount;
-unsigned int sample, sample_Temp, timerTop;
+unsigned char readFlag, switchState, loadData, ADCCount;
+unsigned int sample, sample_Temp;
 unsigned int VTemp, I1Temp, I2Temp;
 float VRaw, I1Raw, I2Raw, I1Sqr, I2Sqr;
 float VSqrSum, I1SqrSum, I2SqrSum, PSum;
 float I1SqrSum_Temp, I2SqrSum_Temp, VSqrSum_Temp, PSum_Temp;
 float I1RMS, I2RMS, VRMS, PAVG;
+float timerTop;
 
 void Init (void) {
 	// Define Ports
@@ -212,13 +204,26 @@ void Init (void) {
 	DDRD  = 0b11110010;
 	PORTD = 0b00001101;
 	
+	// Animation
+	sbi(POWERLED_P,POWERLED);
+	_delay_ms(300);
+	cbi(POWERLED_P,POWERLED);
+	_delay_ms(300);
+	sbi(POWERLED_P,POWERLED);
+	_delay_ms(300);
+	cbi(POWERLED_P,POWERLED);
+	_delay_ms(300);
+	
 	// Initialize ADC
-	ADCSRA = _BV(ADEN)|_BV(ADSC)|_BV(ADFR)|_BV(ADIE)|(0b111<<ADPS0);
-	ADMUX = (0b01<<REFS0);
+	//ADCSRA = _BV(ADEN)|_BV(ADIE)|(0b111<<ADPS0);
+	//ADMUX = (0b01<<REFS0)|_BV(ADLAR);
+	ADMUX=ADC_VREF_TYPE & 0xff;
+	ADCSRA=0x84;
+	DIDR0 = 0x3F;
 	
 	// Initialize Interrupt
 	MCUCR = (0b10<<ISC10);
-	GICR = _BV(INT1);
+	EIMSK = _BV(INT1);
 	
 	// Initialize SPI
 	SPCR = _BV(SPE)|_BV(MSTR);
@@ -226,14 +231,40 @@ void Init (void) {
 	// Initialize Timer
 	TCCR1A = (0b11<<WGM10)|(0b10<<COM1B0);
 	TCCR1B = (0b11<<WGM12)|(0b101<<CS10);
+	OCR1AH = 255;
+	OCR1AL = 255;
 	OCR1BH = 0;
 	OCR1BL = 250;
+	
+	//Set timer interrupt with frequency 100Hz
+  TCCR0A = 0;// set entire TCCR2A register to 0
+  TCCR0B = 0;// same for TCCR2B
+  TCNT0  = 0;//initialize counter value to 0
+  // 1 ms
+  OCR0A = 15;// = (16*10^6) / (1000*1024) - 1 (must be <256)
+  // turn on CTC mode
+  TCCR0A |= (1 << WGM01);
+  // Set CS01 and CS00 bits for 1024 prescaler
+  TCCR0B |= (1 << CS02) | (1 << CS00);   
+  // enable timer compare interrupt
+  TIMSK0 |= (1 << OCIE0A);
+	
+	// Initialize USART
+	UCSR0A=0x00;
+	UCSR0B=0x08;
+	UCSR0C=0x06;
+	UBRR0H=0x00;
+	UBRR0L=0x67;
 	
 	// Global Interrupt Enable
 	sei();
 	
 	// Variable Initialization
 	readFlag = 0;
+	switchState = 1;
+	sbi(POWERLED_P,POWERLED);
+	ADCCount = 3;
+	ADCSRA |= _BV(ADSC);
 }
 
 unsigned int read_adc (unsigned char channel) {
@@ -243,12 +274,27 @@ unsigned int read_adc (unsigned char channel) {
 		char c[2];
 	} ADCValue;
 	
+	/*
 	ADCValue.c[0] = ADCH;
 	ADCValue.c[1] = ADCL;
+	UDR0 = ADCH;
 	ADMUX |= channel;
-	ADCSRA |= 0x10;						// Clear the flags
+	_delay_us(10);
     ADCSRA |= _BV(ADSC);				// Start the AD conversion
-    return ADCValue.i;
+	*/
+	
+	ADMUX=channel | (ADC_VREF_TYPE & 0xff);
+	// Delay needed for the stabilization of the ADC input voltage
+	_delay_us(10);
+	// Start the AD conversion
+	ADCSRA|=0x40;
+	// Wait for the AD conversion to complete
+	while ((ADCSRA & 0x10)==0);
+	ADCSRA|=0x10;
+	ADCValue.c[1] = ADCL;
+	ADCValue.c[0] = ADCH;
+	UDR0 = ADCH;
+	return ADCValue.i;
 }
 
 char WriteByteSPI (unsigned char cData) {
@@ -385,9 +431,10 @@ void ReadVI (void) {
 		case 5 :
 			ADCCount = 3;
 			I2Temp = read_adc(ADCCount);
-			VRaw = (VTemp-512)*1.0791015625;		// Normalize : (VTemp-512)*221*5/1024
-			I1Raw = (-0.00732421875*I1Raw)+2.5;		// Normalize : (-1.5*I1Raw*5/1024)+2.5
-			I2Raw = (-0.00732421875*I2Raw)+2.5;		// Normalize : (-1.5*I2Raw*5/1024)+2.5
+			VRaw = (VTemp-128)*4.31640625;		// Normalize : (VTemp-512)*221*5/1024
+			I1Raw = (-0.029296875*I1Raw)+2.5;		// Normalize : (-1.5*I1Raw*5/1024)+2.5
+			I2Raw = (-0.029296875*I2Raw)+2.5;		// Normalize : (-1.5*I2Raw*5/1024)+2.5
+			UDR0 = (unsigned char) VRaw;
 			I1Sqr = I1Raw*I1Raw;
 			I2Sqr = I2Raw*I2Raw;
 			VSqrSum += VRaw*VRaw;
@@ -418,12 +465,13 @@ void Calculate (void) {
 	I2RMS = sqrt(I2SqrSum_Temp/sample_Temp);
 	VRMS = sqrt(VSqrSum_Temp/sample_Temp);
 	PAVG = sqrt(PSum_Temp/sample_Temp);
-	timerTop = (59400/(unsigned int)PAVG) + 250;
-	OCR1AH = (unsigned char) (timerTop >> 8);
-	OCR1AL = (unsigned char) (timerTop & 0xFF);
+	if (PAVG!=0)
+		timerTop = (59400/PAVG) + 250;
+	OCR1AH = (unsigned char) ((unsigned int) (timerTop) >> 8);
+	OCR1AL = (unsigned char) ((unsigned int) (timerTop) & 0xFF);
 }
 
-ISR (ADC_vect) {
+ISR (TIMER0_COMPA_vect) {
 	ReadVI();
 }
 
@@ -455,32 +503,11 @@ int main (void) {
 		if (readFlag) {
 			NRF_Write(R, R_RX_PAYLOAD, &rData, 1);
 			switchState = rData & 0x01;
-			lightState = rData & 0x7E;
 			loadData = rData & 0x80;
 			if (switchState == 1)
 				sbi(RELAY_P,RELAY);
 			else
 				cbi(RELAY_P,RELAY);
-			if ((lightState >> 1) == 0) {
-				if ((lightState << 7) != 0) {	// Functional
-					TCCR1A = 0b10<<COM1B0;
-					sbi(POWERLED_P,POWERLED);
-					if (switchState == 1)
-						sbi(RELAYLED_P,RELAYLED);
-					else
-						cbi(RELAYLED_P,RELAYLED);
-				} else {						// All On
-					TCCR1A = 0b00<<COM1B0;
-					sbi(ENERGYLED_P,ENERGYLED);
-					sbi(POWERLED_P,POWERLED);
-					sbi(RELAYLED_P,RELAYLED);
-				}
-			} else {							// All Off
-				TCCR1A = 0b00<<COM1B0;
-				cbi(ENERGYLED_P,ENERGYLED);
-				cbi(POWERLED_P,POWERLED);
-				cbi(RELAYLED_P,RELAYLED);
-			}
 		}
 		
 		if (loadData) {
@@ -511,7 +538,7 @@ int main (void) {
 			tData[2] = PAVG_.c[2];
 			tData[1] = PAVG_.c[3];
 			
-			tData[0] = switchState + lightState;
+			tData[0] = switchState;
 			
 			NRF_Write(R, W_TX_PAYLOAD, tData, 13);
 		}

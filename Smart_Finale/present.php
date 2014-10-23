@@ -1,8 +1,5 @@
 <?php 
-    	$dbhost 	= "localhost"; 
-	$dbname		= "smart_smartsocket";
-	$dbuser		= "monitor";
-	$dbpass		= "smartsocket";
+ 	include_once("psl-config.php");
 	// database connection
 	$con = mysql_connect($dbhost,$dbuser,$dbpass);
     if (!$con) {

@@ -2,10 +2,9 @@
 /**
  * These are the database login details
  */  
-$dbhost 	= "localhost";
-$dbname         = "smart_smartsocket";
-$dbuser         = "monitor";
-$dbpass         = "smartsocket"; 
+$dbhost         = "localhost";name		= "smartmeter";
+$dbuser		= "root";
+$dbpass		= "password";	 
 
 define("HOST", "localhost");     // The host you want to connect to.
 define("USER", "root");    // The database username. 
@@ -19,3 +18,4 @@ define("TBL_setting", "setting");    // The Table
 define("TBL_switching", "switching");    // The Table
 define("TBL_total", "total");    // The Table
 ?>
+

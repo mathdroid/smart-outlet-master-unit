@@ -1,9 +1,5 @@
 <?php    
-	$dbhost 	= "localhost";
-	//$dbname		= "muhammad_smartmeter";
-	$dbname		= "smart_smartsocket";
-	$dbuser		= "monitor";
-	$dbpass		= "smartsocket";
+	include_once("psl-config.php");
     
     	$totalbudget= 0;
 	$totalkwh	= 0;

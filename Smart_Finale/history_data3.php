@@ -34,11 +34,11 @@
 //
 //    print json_encode($result, JSON_NUMERIC_CHECK);
 //    mysql_close($con);
-	$dbhost 	= "localhost";
-	$dbname		= "smart_smartsocket";
-	$dbuser		= "monitor";
-	$dbpass		= "smartsocket";
-    
+//	$dbhost 	= "localhost";
+//	$dbname		= "smart_smartsocket";
+//	$dbuser		= "monitor";
+//	$dbpass		= "smartsocket";
+    include_once("psl-config.php");  
     $Minggu_budget = 0;
     $Minggu_kwh = 0;
     $Senin_budget = 0;

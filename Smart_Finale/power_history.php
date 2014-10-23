@@ -1,9 +1,9 @@
 <?php    
-	$dbhost 	= "localhost";
-	$dbname		= "muhammad_smartmeter";
-	$dbuser		= "root";
-	$dbpass		= "password";
-    
+//	$dbhost 	= "localhost";
+//	$dbname		= "muhammad_smartmeter";
+//	$dbuser		= "root";
+//	$dbpass		= "password";
+    include_once("psl-config.php");  
     $Minggu_budget = 0;
     $Minggu_kwh = 0;
     $Senin_budget = 0;

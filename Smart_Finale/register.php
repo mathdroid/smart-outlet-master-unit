@@ -1,5 +1,6 @@
 <?php 
 	include_once("login2.php");
+	include_once("psl-config.php");
 ?>
 
 <?php if( !(isset( $_POST['register'] ) ) ) { ?>

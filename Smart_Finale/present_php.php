@@ -1,8 +1,9 @@
 <?php
-	$dbhost 	= "localhost";
-	$dbname		= "smart_smartsocket";
-	$dbuser		= "monitor";
-	$dbpass		= "smartsocket";	 
+include_once("psl-config.php");
+//	$dbhost 	= "localhost";
+//	$dbname		= "smart_smartsocket";
+//	$dbuser		= "monitor";
+//	$dbpass		= "smartsocket";	 
 	  
     $conn = new PDO("mysql:host=$dbhost;dbname=$dbname",$dbuser,$dbpass);
 	$conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
